@@ -75,4 +75,21 @@ describe('SessionStore', () => {
     const store = new SessionStore(':memory:');
     expect(() => store.setError('missing', 'synthesizer failed')).toThrow('Session not found: missing');
   });
+
+  it('replaces one round in place without disturbing other rounds', () => {
+    const store = new SessionStore(':memory:');
+    store.createSession('s1', 'prompt');
+    store.appendRound('s1', { round: 1, answers: [] });
+    store.appendRound('s1', { round: 2, answers: [] });
+
+    store.replaceRound('s1', {
+      round: 1,
+      answers: [{ model: 'anthropic/claude-sonnet-5', status: 'ok', text: 'updated', confidence: 90 }],
+    });
+
+    const rounds = store.getSession('s1')?.rounds;
+    expect(rounds).toHaveLength(2);
+    expect(rounds?.find((r) => r.round === 1)?.answers[0].text).toBe('updated');
+    expect(rounds?.find((r) => r.round === 2)?.answers).toEqual([]);
+  });
 });

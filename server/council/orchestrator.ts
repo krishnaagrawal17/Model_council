@@ -119,6 +119,24 @@ export class CouncilOrchestrator {
     this.events.emit(sessionId, { type: 'session_complete', verdictText: text, verdictTable });
   }
 
+  async retryModel(sessionId: string, round: 1 | 2 | 3, model: CouncilModelId): Promise<ModelAnswer> {
+    const session = this.store.getSession(sessionId);
+    if (!session) throw new Error(`Session not found: ${sessionId}`);
+    const roundResult = session.rounds.find((r) => r.round === round);
+    if (!roundResult) throw new Error(`Round ${round} not found for session ${sessionId}`);
+
+    const priorRounds = session.rounds.filter((r) => r.round < round);
+    const messages =
+      round === 1 ? buildRound1Messages(session.prompt) : buildDebateRoundMessages(session.prompt, model, priorRounds);
+
+    const updatedAnswer = await this.runModelTurn(sessionId, round, model, messages);
+    const updatedAnswers = roundResult.answers.map((a) => (a.model === model ? updatedAnswer : a));
+    const updatedRound: RoundResult = { round, answers: updatedAnswers };
+    this.store.replaceRound(sessionId, updatedRound);
+    this.events.emit(sessionId, { type: 'round_complete', round, result: updatedRound });
+    return updatedAnswer;
+  }
+
   async run(sessionId: string, prompt: string): Promise<void> {
     try {
       const round1 = await this.runRound1(sessionId, prompt);

@@ -36,6 +36,13 @@ export class SessionStore {
     this.db.prepare(`UPDATE sessions SET rounds_json = ? WHERE id = ?`).run(JSON.stringify(rounds), id);
   }
 
+  replaceRound(id: string, result: RoundResult): void {
+    const session = this.getSession(id);
+    if (!session) throw new Error(`Session not found: ${id}`);
+    const rounds = session.rounds.map((r) => (r.round === result.round ? result : r));
+    this.db.prepare(`UPDATE sessions SET rounds_json = ? WHERE id = ?`).run(JSON.stringify(rounds), id);
+  }
+
   setVerdict(id: string, verdictText: string, verdictTable: VerdictRow[]): void {
     const session = this.getSession(id);
     if (!session) throw new Error(`Session not found: ${id}`);

@@ -184,6 +184,25 @@ describe('CouncilOrchestrator.checkConvergence', () => {
   });
 });
 
+describe('CouncilOrchestrator.retryModel', () => {
+  it('replaces a single model answer for a round without touching the others', async () => {
+    const client = new FakeOpenRouterClient();
+    for (const model of COUNCIL_MODELS) client.script(model, ['first try. Confidence: 40%']);
+    const store = new SessionStore(':memory:');
+    store.createSession('s1', 'prompt');
+    const orchestrator = new CouncilOrchestrator(client, store, new RecordingEventSink());
+    await orchestrator.runRound1('s1', 'prompt');
+
+    client.script(COUNCIL_MODELS[1], ['second try. Confidence: 90%']);
+    const updated = await orchestrator.retryModel('s1', 1, COUNCIL_MODELS[1]);
+
+    expect(updated.text).toBe('second try. Confidence: 90%');
+    const round = store.getSession('s1')?.rounds.find((r) => r.round === 1);
+    expect(round?.answers.find((a) => a.model === COUNCIL_MODELS[1])?.text).toBe('second try. Confidence: 90%');
+    expect(round?.answers.find((a) => a.model === COUNCIL_MODELS[0])?.text).toBe('first try. Confidence: 40%');
+  });
+});
+
 describe('CouncilOrchestrator.run', () => {
   it('produces a verdict after 2 rounds when the synthesizer detects convergence', async () => {
     const client = new FakeOpenRouterClient();
