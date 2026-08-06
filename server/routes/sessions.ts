@@ -53,7 +53,12 @@ export function createSessionsRouter(store: SessionStore, orchestrator: CouncilO
       const answer = await orchestrator.retryModel(req.params.id, round as 1 | 2 | 3, model);
       res.json(answer);
     } catch (err) {
-      res.status(404).json({ error: err instanceof Error ? err.message : 'retry failed' });
+      const message = err instanceof Error ? err.message : 'retry failed';
+      if (message.includes('not found')) {
+        res.status(404).json({ error: message });
+      } else {
+        res.status(500).json({ error: message });
+      }
     }
   });
 
