@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { CouncilOrchestrator } from './orchestrator';
 import { FakeOpenRouterClient } from '../openrouter/client';
 import { SessionStore } from '../db/store';
-import { COUNCIL_MODELS, SYNTHESIZER_MODEL_ID } from '../../shared/types';
+import { COUNCIL_MODELS, SYNTHESIZER_MODEL_ID, MODEL_LABELS } from '../../shared/types';
 import type { CouncilEvent } from '../../shared/types';
 
 class RecordingEventSink {
@@ -181,5 +181,72 @@ describe('CouncilOrchestrator.checkConvergence', () => {
     ];
     const converged = await orchestrator.checkConvergence('s1', 'prompt', rounds);
     expect(converged).toBe(true);
+  });
+});
+
+describe('CouncilOrchestrator.run', () => {
+  it('produces a verdict after 2 rounds when the synthesizer detects convergence', async () => {
+    const client = new FakeOpenRouterClient();
+    for (const model of COUNCIL_MODELS) {
+      client.script(model, [`r1 answer from ${model}. Confidence: 70%`]);
+      client.script(model, [`r2 answer from ${model}. Confidence: 80%`]);
+    }
+    client.script(SYNTHESIZER_MODEL_ID, ['CONVERGED. The council agrees.']);
+    const verdictLines = COUNCIL_MODELS.map((m) => `${MODEL_LABELS[m]} | agree`).join('\n');
+    client.script(SYNTHESIZER_MODEL_ID, [`Final verdict text.\n\nVERDICT_TABLE:\n${verdictLines}`]);
+
+    const store = new SessionStore(':memory:');
+    store.createSession('s1', 'prompt');
+    const orchestrator = new CouncilOrchestrator(client, store, new RecordingEventSink());
+
+    await orchestrator.run('s1', 'prompt');
+
+    const session = store.getSession('s1')!;
+    expect(session.status).toBe('complete');
+    expect(session.rounds).toHaveLength(2);
+    expect(session.verdictTable).toHaveLength(4);
+  });
+
+  it('runs a third round when the synthesizer reports no convergence, then still produces a verdict', async () => {
+    const client = new FakeOpenRouterClient();
+    for (const model of COUNCIL_MODELS) {
+      client.script(model, [`r1 from ${model}. Confidence: 60%`]);
+      client.script(model, [`r2 from ${model}. Confidence: 60%`]);
+      client.script(model, [`r3 from ${model}. Confidence: 90%`]);
+    }
+    client.script(SYNTHESIZER_MODEL_ID, ['NOT_CONVERGED. Still disagreement.']);
+    const verdictLines = COUNCIL_MODELS.map((m) => `${MODEL_LABELS[m]} | partial`).join('\n');
+    client.script(SYNTHESIZER_MODEL_ID, [`Final verdict text.\n\nVERDICT_TABLE:\n${verdictLines}`]);
+
+    const store = new SessionStore(':memory:');
+    store.createSession('s2', 'prompt');
+    const orchestrator = new CouncilOrchestrator(client, store, new RecordingEventSink());
+
+    await orchestrator.run('s2', 'prompt');
+
+    const session = store.getSession('s2')!;
+    expect(session.rounds).toHaveLength(3);
+    expect(session.status).toBe('complete');
+  });
+
+  it('marks the session as errored if the synthesizer never recovers', async () => {
+    const client = new FakeOpenRouterClient();
+    for (const model of COUNCIL_MODELS) {
+      client.script(model, [`r1 from ${model}. Confidence: 60%`]);
+      client.script(model, [`r2 from ${model}. Confidence: 60%`]);
+    }
+    client.scriptError(SYNTHESIZER_MODEL_ID, new Error('down'));
+    client.scriptError(SYNTHESIZER_MODEL_ID, new Error('down'));
+    client.scriptError(SYNTHESIZER_MODEL_ID, new Error('down'));
+
+    const store = new SessionStore(':memory:');
+    store.createSession('s3', 'prompt');
+    const orchestrator = new CouncilOrchestrator(client, store, new RecordingEventSink());
+
+    await orchestrator.run('s3', 'prompt');
+
+    const session = store.getSession('s3')!;
+    expect(session.status).toBe('error');
+    expect(session.errorMessage).toContain('down');
   });
 });

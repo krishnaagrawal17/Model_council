@@ -2,7 +2,14 @@ import type { OpenRouterClient } from '../openrouter/client';
 import type { SessionStore } from '../db/store';
 import { COUNCIL_MODELS, SYNTHESIZER_MODEL_ID } from '../../shared/types';
 import type { CouncilEvent, CouncilModelId, ModelAnswer, RoundResult, ChatMessage } from '../../shared/types';
-import { buildRound1Messages, buildDebateRoundMessages, buildConvergenceCheckMessages, parseConfidence } from './prompts';
+import {
+  buildRound1Messages,
+  buildDebateRoundMessages,
+  buildConvergenceCheckMessages,
+  buildFinalSynthesisMessages,
+  parseConfidence,
+  parseVerdictTable,
+} from './prompts';
 
 export interface CouncilEventSink {
   emit(sessionId: string, event: CouncilEvent): void;
@@ -98,5 +105,39 @@ export class CouncilOrchestrator {
       }
     }
     throw lastError instanceof Error ? lastError : new Error(String(lastError));
+  }
+
+  async synthesize(sessionId: string, prompt: string, rounds: RoundResult[]): Promise<void> {
+    this.events.emit(sessionId, { type: 'synthesis_start' });
+    const text = await this.callSynthesizerWithRetry(
+      sessionId,
+      buildFinalSynthesisMessages(prompt, rounds),
+      'final_synthesis',
+    );
+    const verdictTable = parseVerdictTable(text, rounds);
+    this.store.setVerdict(sessionId, text, verdictTable);
+    this.events.emit(sessionId, { type: 'session_complete', verdictText: text, verdictTable });
+  }
+
+  async run(sessionId: string, prompt: string): Promise<void> {
+    try {
+      const round1 = await this.runRound1(sessionId, prompt);
+      const rounds: RoundResult[] = [round1];
+
+      const round2 = await this.runDebateRound(sessionId, prompt, 2, rounds);
+      rounds.push(round2);
+
+      const converged = await this.checkConvergence(sessionId, prompt, rounds);
+      if (!converged) {
+        const round3 = await this.runDebateRound(sessionId, prompt, 3, rounds);
+        rounds.push(round3);
+      }
+
+      await this.synthesize(sessionId, prompt, rounds);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      this.store.setError(sessionId, message);
+      this.events.emit(sessionId, { type: 'session_error', message });
+    }
   }
 }
