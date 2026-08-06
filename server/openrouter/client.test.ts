@@ -55,6 +55,26 @@ describe('RealOpenRouterClient', () => {
       }
     }).rejects.toThrow('OpenRouter request failed: 500 Server Error');
   });
+
+  it('reassembles an SSE line split across two chunks', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: true,
+        body: chunksToStream([
+          'data: {"choices":[{"delta":{"cont',
+          'ent":"Hi"}}]}\n\ndata: [DONE]\n\n',
+        ]),
+      }),
+    );
+
+    const client = new RealOpenRouterClient('test-key');
+    const tokens: string[] = [];
+    for await (const token of client.streamChatCompletion('some/model', [{ role: 'user', content: 'hi' }])) {
+      tokens.push(token);
+    }
+    expect(tokens).toEqual(['Hi']);
+  });
 });
 
 describe('FakeOpenRouterClient', () => {
