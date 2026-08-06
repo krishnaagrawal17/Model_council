@@ -119,5 +119,13 @@ describe('CouncilOrchestrator.runDebateRound', () => {
     expect(round2.answers).toHaveLength(4);
     expect(round2.answers[0].confidence).toBe(70);
     expect(store.getSession('s1')?.rounds).toHaveLength(2);
+
+    // Verify cross-model context: Round 2 calls should include other models' Round 1 answers
+    const round2Calls = client.calls.slice(4); // First 4 calls are Round 1, next 4 are Round 2
+    const model0Round2Call = round2Calls.find((call) => call.model === COUNCIL_MODELS[0]);
+    expect(model0Round2Call).toBeDefined();
+    const messagesText = JSON.stringify(model0Round2Call?.messages);
+    // Verify that another model's Round 1 answer is present in the messages
+    expect(messagesText).toContain(`r1 from ${COUNCIL_MODELS[1]}`);
   });
 });

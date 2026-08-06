@@ -46,6 +46,7 @@ export class RealOpenRouterClient implements OpenRouterClient {
 
 export class FakeOpenRouterClient implements OpenRouterClient {
   private queues = new Map<string, (string[] | Error)[]>();
+  calls: { model: string; messages: ChatMessage[] }[] = [];
 
   script(model: string, tokens: string[]): void {
     const queue = this.queues.get(model) ?? [];
@@ -59,7 +60,8 @@ export class FakeOpenRouterClient implements OpenRouterClient {
     this.queues.set(model, queue);
   }
 
-  async *streamChatCompletion(model: string): AsyncGenerator<string, void, unknown> {
+  async *streamChatCompletion(model: string, messages: ChatMessage[]): AsyncGenerator<string, void, unknown> {
+    this.calls.push({ model, messages });
     const queue = this.queues.get(model);
     const next = queue?.shift();
     if (!next) throw new Error(`No script configured for model: ${model}`);
