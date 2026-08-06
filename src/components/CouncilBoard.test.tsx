@@ -48,4 +48,28 @@ describe('CouncilBoard', () => {
     render(<CouncilBoard stream={emptyStream} />);
     expect(screen.queryByText('Round 1')).not.toBeInTheDocument();
   });
+
+  it('shows completed text instead of stale in-progress text', () => {
+    render(
+      <CouncilBoard
+        stream={{
+          ...emptyStream,
+          roundsInProgress: { 1: { [COUNCIL_MODELS[0]]: 'Partial answer' } },
+          completedRounds: [
+            {
+              round: 1,
+              answers: COUNCIL_MODELS.map((model, i) => ({
+                model,
+                status: 'ok',
+                text: i === 0 ? 'Complete final answer' : 'other answer',
+                confidence: 75,
+              })),
+            },
+          ],
+        }}
+      />,
+    );
+    expect(screen.getByText('Complete final answer')).toBeInTheDocument();
+    expect(screen.queryByText('Partial answer')).not.toBeInTheDocument();
+  });
 });
