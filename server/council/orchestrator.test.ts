@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { CouncilOrchestrator } from './orchestrator';
 import { FakeOpenRouterClient } from '../openrouter/client';
 import { SessionStore } from '../db/store';
-import { COUNCIL_MODELS } from '../../shared/types';
+import { COUNCIL_MODELS, SYNTHESIZER_MODEL_ID } from '../../shared/types';
 import type { CouncilEvent } from '../../shared/types';
 
 class RecordingEventSink {
@@ -127,5 +127,59 @@ describe('CouncilOrchestrator.runDebateRound', () => {
     const messagesText = JSON.stringify(model0Round2Call?.messages);
     // Verify that another model's Round 1 answer is present in the messages
     expect(messagesText).toContain(`r1 from ${COUNCIL_MODELS[1]}`);
+  });
+});
+
+describe('CouncilOrchestrator.checkConvergence', () => {
+  it('returns true when the synthesizer responds CONVERGED', async () => {
+    const client = new FakeOpenRouterClient();
+    client.script(SYNTHESIZER_MODEL_ID, ['CONVERGED. Reasoning here.']);
+    const store = new SessionStore(':memory:');
+    store.createSession('s1', 'prompt');
+    const orchestrator = new CouncilOrchestrator(client, store, new RecordingEventSink());
+
+    const rounds = [
+      {
+        round: 1 as const,
+        answers: COUNCIL_MODELS.map((m) => ({ model: m, status: 'ok' as const, text: 'a', confidence: 50 })),
+      },
+    ];
+    const converged = await orchestrator.checkConvergence('s1', 'prompt', rounds);
+    expect(converged).toBe(true);
+  });
+
+  it('returns false when the synthesizer responds NOT_CONVERGED', async () => {
+    const client = new FakeOpenRouterClient();
+    client.script(SYNTHESIZER_MODEL_ID, ['NOT_CONVERGED. Still disagreement.']);
+    const store = new SessionStore(':memory:');
+    store.createSession('s1', 'prompt');
+    const orchestrator = new CouncilOrchestrator(client, store, new RecordingEventSink());
+
+    const rounds = [
+      {
+        round: 1 as const,
+        answers: COUNCIL_MODELS.map((m) => ({ model: m, status: 'ok' as const, text: 'a', confidence: 50 })),
+      },
+    ];
+    const converged = await orchestrator.checkConvergence('s1', 'prompt', rounds);
+    expect(converged).toBe(false);
+  });
+
+  it('retries the synthesizer call on failure before giving up', async () => {
+    const client = new FakeOpenRouterClient();
+    client.scriptError(SYNTHESIZER_MODEL_ID, new Error('rate limited'));
+    client.script(SYNTHESIZER_MODEL_ID, ['CONVERGED. Recovered.']);
+    const store = new SessionStore(':memory:');
+    store.createSession('s1', 'prompt');
+    const orchestrator = new CouncilOrchestrator(client, store, new RecordingEventSink());
+
+    const rounds = [
+      {
+        round: 1 as const,
+        answers: COUNCIL_MODELS.map((m) => ({ model: m, status: 'ok' as const, text: 'a', confidence: 50 })),
+      },
+    ];
+    const converged = await orchestrator.checkConvergence('s1', 'prompt', rounds);
+    expect(converged).toBe(true);
   });
 });

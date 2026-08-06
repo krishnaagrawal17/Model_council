@@ -1,8 +1,8 @@
 import type { OpenRouterClient } from '../openrouter/client';
 import type { SessionStore } from '../db/store';
-import { COUNCIL_MODELS } from '../../shared/types';
+import { COUNCIL_MODELS, SYNTHESIZER_MODEL_ID } from '../../shared/types';
 import type { CouncilEvent, CouncilModelId, ModelAnswer, RoundResult, ChatMessage } from '../../shared/types';
-import { buildRound1Messages, buildDebateRoundMessages, parseConfidence } from './prompts';
+import { buildRound1Messages, buildDebateRoundMessages, buildConvergenceCheckMessages, parseConfidence } from './prompts';
 
 export interface CouncilEventSink {
   emit(sessionId: string, event: CouncilEvent): void;
@@ -62,5 +62,41 @@ export class CouncilOrchestrator {
       this.events.emit(sessionId, { type: 'model_error', round, model, message });
       return { model, status: 'no_response', text: '', confidence: null };
     }
+  }
+
+  async checkConvergence(sessionId: string, prompt: string, rounds: RoundResult[]): Promise<boolean> {
+    const text = await this.callSynthesizerWithRetry(
+      sessionId,
+      buildConvergenceCheckMessages(prompt, rounds),
+      'convergence_check',
+    );
+    return text.trim().toUpperCase().startsWith('CONVERGED');
+  }
+
+  protected async callSynthesizerWithRetry(
+    sessionId: string,
+    messages: ChatMessage[],
+    purpose: 'convergence_check' | 'final_synthesis',
+    attempts = 3,
+  ): Promise<string> {
+    let lastError: unknown;
+    for (let attempt = 1; attempt <= attempts; attempt += 1) {
+      try {
+        let text = '';
+        for await (const token of this.client.streamChatCompletion(SYNTHESIZER_MODEL_ID, messages)) {
+          text += token;
+          if (purpose === 'final_synthesis') {
+            this.events.emit(sessionId, { type: 'token', phase: 'synthesis', model: 'synthesizer', token });
+          }
+        }
+        return text;
+      } catch (err) {
+        lastError = err;
+        if (attempt < attempts) {
+          await new Promise((resolve) => setTimeout(resolve, 200 * attempt));
+        }
+      }
+    }
+    throw lastError instanceof Error ? lastError : new Error(String(lastError));
   }
 }
