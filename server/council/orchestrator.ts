@@ -2,7 +2,7 @@ import type { OpenRouterClient } from '../openrouter/client';
 import type { SessionStore } from '../db/store';
 import { COUNCIL_MODELS } from '../../shared/types';
 import type { CouncilEvent, CouncilModelId, ModelAnswer, RoundResult, ChatMessage } from '../../shared/types';
-import { buildRound1Messages, parseConfidence } from './prompts';
+import { buildRound1Messages, buildDebateRoundMessages, parseConfidence } from './prompts';
 
 export interface CouncilEventSink {
   emit(sessionId: string, event: CouncilEvent): void;
@@ -23,6 +23,24 @@ export class CouncilOrchestrator {
     const result: RoundResult = { round: 1, answers };
     this.store.appendRound(sessionId, result);
     this.events.emit(sessionId, { type: 'round_complete', round: 1, result });
+    return result;
+  }
+
+  async runDebateRound(
+    sessionId: string,
+    prompt: string,
+    round: 2 | 3,
+    priorRounds: RoundResult[],
+  ): Promise<RoundResult> {
+    this.events.emit(sessionId, { type: 'round_start', round });
+    const answers = await Promise.all(
+      COUNCIL_MODELS.map((model) =>
+        this.runModelTurn(sessionId, round, model, buildDebateRoundMessages(prompt, model, priorRounds)),
+      ),
+    );
+    const result: RoundResult = { round, answers };
+    this.store.appendRound(sessionId, result);
+    this.events.emit(sessionId, { type: 'round_complete', round, result });
     return result;
   }
 

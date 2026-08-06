@@ -100,3 +100,24 @@ describe('CouncilOrchestrator.runRound1', () => {
     expect(result.answers.every((a) => a.status === 'ok')).toBe(true);
   });
 });
+
+describe('CouncilOrchestrator.runDebateRound', () => {
+  it("gives each model the other three's Round 1 answers and produces a Round 2 result", async () => {
+    const client = new FakeOpenRouterClient();
+    for (const model of COUNCIL_MODELS) {
+      client.script(model, [`r1 from ${model}. Confidence: 50%`]);
+      client.script(model, [`r2 from ${model}. Confidence: 70%`]);
+    }
+    const store = new SessionStore(':memory:');
+    store.createSession('s1', 'prompt');
+    const orchestrator = new CouncilOrchestrator(client, store, new RecordingEventSink());
+
+    const round1 = await orchestrator.runRound1('s1', 'prompt');
+    const round2 = await orchestrator.runDebateRound('s1', 'prompt', 2, [round1]);
+
+    expect(round2.round).toBe(2);
+    expect(round2.answers).toHaveLength(4);
+    expect(round2.answers[0].confidence).toBe(70);
+    expect(store.getSession('s1')?.rounds).toHaveLength(2);
+  });
+});
