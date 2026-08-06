@@ -59,8 +59,16 @@ function applyEvent(prev: CouncilStreamState, event: CouncilEvent): CouncilStrea
       roundTokens[event.model] = (roundTokens[event.model] ?? '') + event.token;
       return { ...prev, roundsInProgress: { ...prev.roundsInProgress, [phaseKey]: roundTokens } };
     }
-    case 'round_complete':
-      return { ...prev, completedRounds: [...prev.completedRounds, event.result] };
+    case 'round_complete': {
+      const existingIndex = prev.completedRounds.findIndex((r) => r.round === event.result.round);
+      const updated = [...prev.completedRounds];
+      if (existingIndex >= 0) {
+        updated[existingIndex] = event.result;
+      } else {
+        updated.push(event.result);
+      }
+      return { ...prev, completedRounds: updated };
+    }
     case 'model_error':
       return { ...prev, errors: [...prev.errors, { round: event.round, model: event.model, message: event.message }] };
     case 'session_complete':

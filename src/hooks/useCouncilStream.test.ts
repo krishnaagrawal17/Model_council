@@ -61,4 +61,25 @@ describe('useCouncilStream', () => {
     expect(result.current.errors).toHaveLength(1);
     expect(result.current.status).toBe('running');
   });
+
+  it('upserts round_complete events by round number instead of duplicating', () => {
+    const { result } = renderHook(() => useCouncilStream('session-1'));
+    const source = FakeEventSource.instances[0];
+
+    act(() => {
+      source.emit({
+        type: 'round_complete',
+        round: 1,
+        result: { round: 1, answers: [{ model: 'anthropic/claude-sonnet-5', status: 'ok', text: 'First', confidence: 50 }] },
+      });
+      source.emit({
+        type: 'round_complete',
+        round: 1,
+        result: { round: 1, answers: [{ model: 'anthropic/claude-sonnet-5', status: 'ok', text: 'Updated', confidence: 80 }] },
+      });
+    });
+
+    expect(result.current.completedRounds).toHaveLength(1);
+    expect(result.current.completedRounds[0].answers[0].text).toBe('Updated');
+  });
 });

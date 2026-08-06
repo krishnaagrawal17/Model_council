@@ -23,7 +23,7 @@ export async function fetchHistory(): Promise<Session[]> {
 }
 
 export async function retryModel(sessionId: string, round: number, model: string) {
-  const res = await fetch(`/api/sessions/${sessionId}/retry/${model}?round=${round}`, { method: 'POST' });
+  const res = await fetch(`/api/sessions/${sessionId}/retry/${encodeURIComponent(model)}?round=${round}`, { method: 'POST' });
   if (!res.ok) throw new Error('Retry failed');
   return res.json();
 }
