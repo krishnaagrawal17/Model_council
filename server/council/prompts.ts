@@ -99,5 +99,10 @@ export function parseVerdictTable(synthesisText: string, rounds: RoundResult[]):
       confidence: answer?.confidence ?? null,
     });
   }
+  if (rows.length !== COUNCIL_MODELS.length) {
+    console.warn(
+      `parseVerdictTable: expected ${COUNCIL_MODELS.length} verdict rows, got ${rows.length}. Synthesizer output may not match the expected format.`,
+    );
+  }
   return rows;
 }

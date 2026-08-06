@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import {
   buildRound1Messages,
   buildDebateRoundMessages,
@@ -96,5 +96,33 @@ describe('parseVerdictTable', () => {
     expect(table[0].agreement).toBe('agree');
     expect(table[0].confidence).toBe(77);
     expect(table[0].finalPosition).toBe(`final-${COUNCIL_MODELS[0]}`);
+  });
+
+  it('warns when verdict table is incomplete or missing', () => {
+    const spy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const rounds: RoundResult[] = [
+      {
+        round: 2,
+        answers: COUNCIL_MODELS.map((model) => ({ model, status: 'ok', text: `final-${model}`, confidence: 77 })),
+      },
+    ];
+    // Missing VERDICT_TABLE: marker entirely
+    const textWithoutMarker = 'Verdict text here. No table.';
+    parseVerdictTable(textWithoutMarker, rounds);
+    expect(spy).toHaveBeenCalledWith(
+      expect.stringContaining(`expected ${COUNCIL_MODELS.length} verdict rows, got 0`),
+    );
+    spy.mockClear();
+
+    // Missing one verdict line
+    const verdictLines = COUNCIL_MODELS.slice(0, 3)
+      .map((m) => `${MODEL_LABELS[m]} | agree`)
+      .join('\n');
+    const textWithIncompleteTable = `Verdict text here.\n\nVERDICT_TABLE:\n${verdictLines}`;
+    parseVerdictTable(textWithIncompleteTable, rounds);
+    expect(spy).toHaveBeenCalledWith(
+      expect.stringContaining(`expected ${COUNCIL_MODELS.length} verdict rows, got 3`),
+    );
+    vi.restoreAllMocks();
   });
 });
