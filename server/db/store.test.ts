@@ -54,4 +54,25 @@ describe('SessionStore', () => {
     const sessions = store.listSessions();
     expect(sessions.map((s) => s.id)).toEqual(['s2', 's1']);
   });
+
+  it('throws when appending round to missing session', () => {
+    const store = new SessionStore(':memory:');
+    expect(() => store.appendRound('missing', { round: 1, answers: [] })).toThrow(
+      'Session not found: missing',
+    );
+  });
+
+  it('throws when setting verdict on missing session', () => {
+    const store = new SessionStore(':memory:');
+    expect(() =>
+      store.setVerdict('missing', 'Final answer', [
+        { model: 'anthropic/claude-sonnet-5', finalPosition: 'x', agreement: 'agree', confidence: 90 },
+      ]),
+    ).toThrow('Session not found: missing');
+  });
+
+  it('throws when setting error on missing session', () => {
+    const store = new SessionStore(':memory:');
+    expect(() => store.setError('missing', 'synthesizer failed')).toThrow('Session not found: missing');
+  });
 });

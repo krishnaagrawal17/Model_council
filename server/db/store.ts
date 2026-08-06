@@ -37,12 +37,16 @@ export class SessionStore {
   }
 
   setVerdict(id: string, verdictText: string, verdictTable: VerdictRow[]): void {
+    const session = this.getSession(id);
+    if (!session) throw new Error(`Session not found: ${id}`);
     this.db
       .prepare(`UPDATE sessions SET status = 'complete', verdict_text = ?, verdict_table_json = ? WHERE id = ?`)
       .run(verdictText, JSON.stringify(verdictTable), id);
   }
 
   setError(id: string, message: string): void {
+    const session = this.getSession(id);
+    if (!session) throw new Error(`Session not found: ${id}`);
     this.db.prepare(`UPDATE sessions SET status = 'error', error_message = ? WHERE id = ?`).run(message, id);
   }
 
