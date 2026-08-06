@@ -44,8 +44,59 @@ describe('CouncilOrchestrator.runRound1', () => {
 
     const result = await orchestrator.runRound1('s1', 'prompt');
 
+    // Assert the failed model is marked as no_response
     const failed = result.answers.find((a) => a.model === COUNCIL_MODELS[1]);
     expect(failed?.status).toBe('no_response');
     expect(events.events.some((e) => e.type === 'model_error' && e.model === COUNCIL_MODELS[1])).toBe(true);
+
+    // Assert round still has all 4 answers with 3/4 successful
+    expect(result.answers).toHaveLength(4);
+    expect(result.answers.filter((a) => a.status === 'ok')).toHaveLength(3);
+
+    // Assert the successful models have expected text and confidence
+    const success0 = result.answers.find((a) => a.model === COUNCIL_MODELS[0]);
+    expect(success0?.status).toBe('ok');
+    expect(success0?.text).toBe('ok answer. Confidence: 50%');
+    expect(success0?.confidence).toBe(50);
+
+    const success2 = result.answers.find((a) => a.model === COUNCIL_MODELS[2]);
+    expect(success2?.status).toBe('ok');
+    expect(success2?.text).toBe('ok answer. Confidence: 50%');
+    expect(success2?.confidence).toBe(50);
+
+    const success3 = result.answers.find((a) => a.model === COUNCIL_MODELS[3]);
+    expect(success3?.status).toBe('ok');
+    expect(success3?.text).toBe('ok answer. Confidence: 50%');
+    expect(success3?.confidence).toBe(50);
+  });
+
+  it('accumulates multi-token responses and parses confidence from full text', async () => {
+    const client = new FakeOpenRouterClient();
+    // Script model 0 with multiple token chunks to test accumulation
+    client.script(COUNCIL_MODELS[0], ['Some ans', 'wer text. ', 'Confidence: 80%']);
+    client.script(COUNCIL_MODELS[1], ['Single token response. Confidence: 60%']);
+    client.script(COUNCIL_MODELS[2], ['Another ', 'multi-token ', 'response. Confidence: 70%']);
+    client.script(COUNCIL_MODELS[3], ['Last model. Confidence: 75%']);
+    const store = new SessionStore(':memory:');
+    store.createSession('s1', 'prompt');
+    const orchestrator = new CouncilOrchestrator(client, store, new RecordingEventSink());
+
+    const result = await orchestrator.runRound1('s1', 'prompt');
+
+    // Verify model 0 with 3 tokens accumulated correctly
+    const answer0 = result.answers.find((a) => a.model === COUNCIL_MODELS[0]);
+    expect(answer0?.status).toBe('ok');
+    expect(answer0?.text).toBe('Some answer text. Confidence: 80%');
+    expect(answer0?.confidence).toBe(80);
+
+    // Verify model 2 with 3 tokens accumulated correctly
+    const answer2 = result.answers.find((a) => a.model === COUNCIL_MODELS[2]);
+    expect(answer2?.status).toBe('ok');
+    expect(answer2?.text).toBe('Another multi-token response. Confidence: 70%');
+    expect(answer2?.confidence).toBe(70);
+
+    // All answers present and successful
+    expect(result.answers).toHaveLength(4);
+    expect(result.answers.every((a) => a.status === 'ok')).toBe(true);
   });
 });
