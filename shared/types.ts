@@ -1,7 +1,7 @@
 export type CouncilModelId =
   | 'anthropic/claude-sonnet-5'
   | 'openai/gpt-5.6-luna'
-  | 'x-ai/grok-latest'
+  | '~x-ai/grok-latest'
   | 'google/gemini-3.5-flash-lite';
 
 export const SYNTHESIZER_MODEL_ID = 'anthropic/claude-opus-5' as const;
@@ -9,14 +9,14 @@ export const SYNTHESIZER_MODEL_ID = 'anthropic/claude-opus-5' as const;
 export const COUNCIL_MODELS: CouncilModelId[] = [
   'anthropic/claude-sonnet-5',
   'openai/gpt-5.6-luna',
-  'x-ai/grok-latest',
+  '~x-ai/grok-latest',
   'google/gemini-3.5-flash-lite',
 ];
 
 export const MODEL_LABELS: Record<CouncilModelId, string> = {
   'anthropic/claude-sonnet-5': 'Claude Sonnet 5',
   'openai/gpt-5.6-luna': 'GPT-5.6 Luna',
-  'x-ai/grok-latest': 'Grok latest',
+  '~x-ai/grok-latest': 'Grok latest',
   'google/gemini-3.5-flash-lite': 'Gemini 3.5 Flash Lite',
 };
 
