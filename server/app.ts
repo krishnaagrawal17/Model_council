@@ -1,4 +1,3 @@
-// server/app.ts
 import express from 'express';
 import type { SessionStore } from './db/store';
 import type { CouncilOrchestrator } from './council/orchestrator';

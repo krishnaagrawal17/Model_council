@@ -1,4 +1,4 @@
-// server/index.ts
+import 'dotenv/config';
 import { createApp } from './app';
 import { SessionStore } from './db/store';
 import { SseHub } from './council/sseHub';
