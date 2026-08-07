@@ -78,6 +78,20 @@ export function parseConfidence(text: string): number | null {
   return Number.isFinite(value) ? Math.min(100, Math.max(0, value)) : null;
 }
 
+const SEPARATOR_ROW_PATTERN = /^[\s\-|:]+$/;
+const AGREEMENT_WORD_PATTERN = /(agree|disagree|partial)/i;
+
+function stripTableRowSyntax(line: string): string {
+  let stripped = line.trim();
+  if (stripped.startsWith('|')) stripped = stripped.slice(1);
+  if (stripped.endsWith('|')) stripped = stripped.slice(0, -1);
+  return stripped.trim();
+}
+
+function stripEmphasis(text: string): string {
+  return text.replace(/(\*\*|\*|__|_)/g, '').trim();
+}
+
 export function parseVerdictTable(synthesisText: string, rounds: RoundResult[]): VerdictRow[] {
   const marker = 'VERDICT_TABLE:';
   const idx = synthesisText.indexOf(marker);
@@ -86,16 +100,46 @@ export function parseVerdictTable(synthesisText: string, rounds: RoundResult[]):
   const labelToModel = new Map(COUNCIL_MODELS.map((m) => [MODEL_LABELS[m], m]));
 
   const rows: VerdictRow[] = [];
-  for (const line of tableSection.split('\n')) {
-    const match = line.match(/^\s*([A-Za-z0-9 .\-]+?)\s*\|\s*(agree|disagree|partial)\s*$/i);
-    if (!match) continue;
-    const model = labelToModel.get(match[1].trim());
-    if (!model) continue;
+  for (const rawLine of tableSection.split('\n')) {
+    if (!rawLine.trim()) continue;
+    if (SEPARATOR_ROW_PATTERN.test(rawLine)) continue;
+
+    const line = stripTableRowSyntax(rawLine);
+    if (!line) continue;
+
+    let model: CouncilModelId | undefined;
+    let agreementWord: string | undefined;
+
+    const match = line.match(/^\s*([A-Za-z0-9 .\-*_]+?)\s*\|\s*(agree|disagree|partial)\s*$/i);
+    if (match) {
+      model = labelToModel.get(stripEmphasis(match[1]));
+      agreementWord = match[2];
+    }
+
+    if (!model) {
+      // Fallback: search for a known model label anywhere in the line, followed later
+      // by one of the agreement words, tolerating markdown emphasis and table formatting.
+      const lowerLine = line.toLowerCase();
+      for (const [label, candidateModel] of labelToModel) {
+        const labelIdx = lowerLine.indexOf(label.toLowerCase());
+        if (labelIdx === -1) continue;
+        const rest = line.slice(labelIdx + label.length);
+        const agreementMatch = rest.match(AGREEMENT_WORD_PATTERN);
+        if (agreementMatch) {
+          model = candidateModel;
+          agreementWord = agreementMatch[1];
+          break;
+        }
+      }
+    }
+
+    if (!model || !agreementWord) continue;
+
     const answer = lastRound.answers.find((a) => a.model === model);
     rows.push({
       model,
       finalPosition: answer?.text ?? '',
-      agreement: match[2].toLowerCase() as VerdictRow['agreement'],
+      agreement: agreementWord.toLowerCase() as VerdictRow['agreement'],
       confidence: answer?.confidence ?? null,
     });
   }

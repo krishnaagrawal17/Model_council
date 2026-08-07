@@ -125,4 +125,35 @@ describe('parseVerdictTable', () => {
     );
     vi.restoreAllMocks();
   });
+
+  it('parses a Markdown-table-formatted verdict section with leading/trailing pipes and a divider row', () => {
+    const rounds: RoundResult[] = [
+      {
+        round: 2,
+        answers: COUNCIL_MODELS.map((model) => ({ model, status: 'ok', text: `final-${model}`, confidence: 77 })),
+      },
+    ];
+    const verdictLines = COUNCIL_MODELS.map((m) => `| ${MODEL_LABELS[m]} | agree |`).join('\n');
+    const text = `Verdict text here.\n\nVERDICT_TABLE:\n| Model | Agreement |\n| --- | --- |\n${verdictLines}`;
+    const table = parseVerdictTable(text, rounds);
+    expect(table).toHaveLength(4);
+    expect(table[0].agreement).toBe('agree');
+    expect(table[0].confidence).toBe(77);
+    expect(table[0].finalPosition).toBe(`final-${COUNCIL_MODELS[0]}`);
+  });
+
+  it('parses a row with bold markdown around the model name', () => {
+    const rounds: RoundResult[] = [
+      {
+        round: 2,
+        answers: COUNCIL_MODELS.map((model) => ({ model, status: 'ok', text: `final-${model}`, confidence: 77 })),
+      },
+    ];
+    const verdictLines = COUNCIL_MODELS.map((m) => `**${MODEL_LABELS[m]}** | agree`).join('\n');
+    const text = `Verdict text here.\n\nVERDICT_TABLE:\n${verdictLines}`;
+    const table = parseVerdictTable(text, rounds);
+    expect(table).toHaveLength(4);
+    expect(table[0].agreement).toBe('agree');
+    expect(table.map((r) => r.model)).toEqual(COUNCIL_MODELS);
+  });
 });
