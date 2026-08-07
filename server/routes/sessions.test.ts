@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import express from 'express';
 import request from 'supertest';
-import { createServer } from 'http';
+import { createServer, get } from 'http';
 import { SessionStore } from '../db/store';
 import { SseHub } from '../council/sseHub';
 import { CouncilOrchestrator } from '../council/orchestrator';
@@ -121,8 +121,7 @@ describe('sessions routes', () => {
         const addr = server.address();
         if (!addr || typeof addr === 'string') return reject(new Error('Invalid server address'));
 
-        const http = require('http');
-        const req = http.get(
+        const req = get(
           {
             hostname: 'localhost',
             port: addr.port,
