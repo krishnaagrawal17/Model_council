@@ -10,6 +10,7 @@ export function PromptForm({ onSubmit, disabled }: PromptFormProps) {
 
   return (
     <form
+      className="prompt-form"
       onSubmit={(e) => {
         e.preventDefault();
         const trimmed = value.trim();
@@ -23,7 +24,7 @@ export function PromptForm({ onSubmit, disabled }: PromptFormProps) {
         placeholder="Ask the council..."
         disabled={disabled}
       />
-      <button type="submit" disabled={disabled || value.trim() === ''}>
+      <button className="btn btn-primary" type="submit" disabled={disabled || value.trim() === ''}>
         Convene Council
       </button>
     </form>

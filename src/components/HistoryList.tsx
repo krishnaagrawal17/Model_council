@@ -16,9 +16,9 @@ export function HistoryList({
   }, [refreshKey]);
 
   return (
-    <ul>
+    <ul className="history-list">
       {sessions.map((s) => (
-        <li key={s.id}>
+        <li key={s.id} className="history-item">
           <button onClick={() => onSelect(s.id)}>{s.prompt}</button>
         </li>
       ))}
