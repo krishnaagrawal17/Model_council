@@ -44,4 +44,22 @@ describe('sessionToMarkdown', () => {
     };
     expect(sessionToMarkdown(session)).toContain('No response');
   });
+
+  it('renders a plain em-dash (not "—%") for a verdict row with null confidence', () => {
+    const session: Session = {
+      id: 's1',
+      prompt: 'prompt',
+      status: 'complete',
+      rounds: [],
+      verdictText: 'Final verdict.',
+      verdictTable: [
+        { model: 'anthropic/claude-sonnet-5', finalPosition: 'no answer', agreement: 'agree', confidence: null },
+      ],
+      createdAt: new Date().toISOString(),
+      errorMessage: null,
+    };
+    const markdown = sessionToMarkdown(session);
+    expect(markdown).toContain('—');
+    expect(markdown).not.toContain('—%');
+  });
 });

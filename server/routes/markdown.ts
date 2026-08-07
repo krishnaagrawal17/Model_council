@@ -21,7 +21,8 @@ export function sessionToMarkdown(session: Session): string {
   if (session.verdictTable) {
     lines.push('## Verdict Table', '', '| Model | Agreement | Confidence |', '|---|---|---|');
     for (const row of session.verdictTable) {
-      lines.push(`| ${MODEL_LABELS[row.model]} | ${row.agreement} | ${row.confidence ?? '—'}% |`);
+      const confidenceText = row.confidence !== null ? `${row.confidence}%` : '—';
+      lines.push(`| ${MODEL_LABELS[row.model]} | ${row.agreement} | ${confidenceText} |`);
     }
   }
 
