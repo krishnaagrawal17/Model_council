@@ -139,4 +139,4 @@ Honest state of the project, confirmed against the code.
 
 ---
 
-Built with AI assistance (Claude Code) using a spec-first workflow: a written design spec and a 17-task TDD implementation plan (both in `docs/superpowers/`) came before any code, and each task was implemented test-first and reviewed before the next one started.
+Built with AI assistance  using a spec-first workflow: a written design spec and a 17-task TDD implementation plan (both in `docs/superpowers/`) came before any code, and each task was implemented test-first and reviewed before the next one started.
